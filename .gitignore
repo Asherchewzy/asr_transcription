@@ -1,0 +1,61 @@
+# Personal local files
+HTX Technical Test (SWE).pdf
+Sample 1.mp3
+Sample 2.mp3
+Sample 3.mp3
+installations
+
+# Env / secrets
+*.env
+*.env.*
+.envrc
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Python build/cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.build/
+dist/
+build/
+wheels/
+.eggs/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.dmypy.json
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+
+# Backend runtime
+*.sqlite3
+*.db
+*.log
+instance/
+uploads/
+notebook/.ipynb_checkpoints/
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+dist/
+coverage/
+*.local
