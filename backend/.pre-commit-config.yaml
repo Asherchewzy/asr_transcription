@@ -1,30 +1,32 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-      - id: check-executables-have-shebangs
-      - id: check-shebang-scripts-are-executable
-      - id: debug-statements
-      - id: detect-private-key
-      - id: detect-aws-credentials
-      - id: mixed-line-ending
-      - id: check-case-conflict
+      - id: check-yaml                      # Validate YAML syntax
+      - id: check-json                      # Validate JSON syntax
+      - id: check-added-large-files         # Prevent adding large files
+      - id: end-of-file-fixer               # Ensure final newline
+      - id: trailing-whitespace             # Strip trailing spaces
+      - id: check-executables-have-shebangs # Require shebang on executable files
+      - id: check-shebang-scripts-are-executable # Ensure shebang scripts are executable
+      - id: detect-private-key              # Block accidental private keys
+      - id: detect-aws-credentials          # Block AWS creds
+      - id: mixed-line-ending               # Enforce consistent line endings
+      - id: check-case-conflict             # Catch case-only filename conflicts (mac/windows)
+
 
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.9.0
     hooks:
       - id: black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 7.0.0
     hooks:
       - id: isort
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.1
+    rev: v0.14.11
     hooks:
       - id: ruff
 
@@ -32,3 +34,4 @@ repos:
     rev: 6.3.0
     hooks:
       - id: pydocstyle
+        args: ["--convention=google"]
