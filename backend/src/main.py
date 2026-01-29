@@ -102,7 +102,7 @@ async def health_check(
 )
 @limiter.limit(lambda: settings.transcribe_rate_limit)
 async def transcribe_audio(
-    _request: Request,  # required for slowapi rate limiting
+    request: Request,  # required for slowapi rate limiting
     file: UploadFile = File(
         ..., description="MP3 audio file to transcribe"
     ),  # ... = required
