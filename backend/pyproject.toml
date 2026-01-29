@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.128.0",
+    "google-re2>=1.1.20251105",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
     "python-magic>=0.4.27",
@@ -38,4 +39,3 @@ dev = [
 ]
 # use uv sync --extra dev
 # uv add <package_name> --optional dev
-
