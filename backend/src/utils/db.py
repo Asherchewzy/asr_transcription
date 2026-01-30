@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
-from sqlalchemy import (DateTime, Index, Integer, String, Text, create_engine,
-                        select)
+from sqlalchemy import (DateTime, Integer, String, Text, create_engine,
+                        func, select)
 from sqlalchemy.orm import (DeclarativeBase, Mapped, Session, mapped_column,
                             sessionmaker)
 from src.utils.settings import get_settings
@@ -55,51 +55,95 @@ class Transcription(Base):
     """Transcription database model."""
 
     __tablename__ = "transcriptions"
-
+    # file name, must be unique
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # PK
     audio_filename: Mapped[str] = mapped_column(
         String(255), nullable=False, unique=True
-    )  # Audio file name, must be unique
-    transcribed_text: Mapped[str] = mapped_column(
-        Text, nullable=False
-    )  # Full transcript text
+    )  
+    # nullable until transcription completes
+    transcribed_text: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  
     created_timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+    # processing, completed, failed
+    status: Mapped[str] = mapped_column(
+        String(50), default='processing', nullable=False
+    )  
+    # celery task ID
+    task_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )  
+    # error details if failed
+    error_message: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  
 
     # for readable string and formatting when logging
     def __repr__(self) -> str:
-        return f"<Transcription(id={self.id}, filename='{self.audio_filename}')>"
+        return f"<Transcription(id={self.id}, filename='{self.audio_filename}', status='{self.status}')>"
 
 
-# --- CRUD ops ---
-
-
+#CRUD
 class TranscriptionRepository:
     """Repository for transcription CRUD operations."""
 
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def create(self, audio_filename: str, transcribed_text: str) -> Transcription:
+    def create(
+        self,
+        audio_filename: str,
+        transcribed_text: str | None = None,
+        status: str = 'processing',
+        task_id: str | None = None
+    ) -> Transcription:
         """Create new transcription record."""
         transcription = Transcription(
             audio_filename=audio_filename,
             transcribed_text=transcribed_text,
+            status=status,
+            task_id=task_id,
         )
         self._db.add(transcription)
         self._db.commit()
         self._db.refresh(transcription)
-        logger.info(f"Created transcription: {transcription.id}")
+        logger.info(f"Created transcription: {transcription.id} with status: {status}")
         return transcription
 
-    def get_all(self) -> Sequence[Transcription]:
+    def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Transcription]:
         """Get all transcriptions, ordered by most recent first."""
-        stmt = select(Transcription).order_by(Transcription.created_timestamp.desc())
+        stmt = (
+            select(Transcription)
+            .order_by(Transcription.created_timestamp.desc())
+            .offset(skip)
+            .limit(limit)
+        )
         return self._db.execute(stmt).scalars().all()
-    
+
+    def get_by_id(self, transcription_id: int) -> Transcription | None:
+        """Get transcription by ID."""
+        stmt = select(Transcription).where(Transcription.id == transcription_id)
+        return self._db.execute(stmt).scalar_one_or_none()
+
+    def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> Sequence[Transcription]:
+        """Get transcriptions by status."""
+        stmt = (
+            select(Transcription)
+            .where(Transcription.status == status)
+            .order_by(Transcription.created_timestamp.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return self._db.execute(stmt).scalars().all()
+
+    def get_by_task_id(self, task_id: str) -> Transcription | None:
+        """Get transcription by Celery task ID."""
+        stmt = select(Transcription).where(Transcription.task_id == task_id)
+        return self._db.execute(stmt).scalar_one_or_none()
+
     # the file name all start with sample, so index won't help much
-    # can think if users will search sample 1 full or just 1 --KIV
     def search_by_filename(self, filename_query: str) -> Sequence[Transcription]:
         """Search transcriptions by filename (partial match)."""
         stmt = (
@@ -108,3 +152,35 @@ class TranscriptionRepository:
             .order_by(Transcription.created_timestamp.desc())
         )
         return self._db.execute(stmt).scalars().all()
+
+    def update_transcription_text(self, transcription_id: int, text: str) -> None:
+        """Update transcribed text."""
+        transcription = self.get_by_id(transcription_id)
+        if transcription:
+            transcription.transcribed_text = text
+            self._db.commit()
+            logger.info(f"Updated transcription {transcription_id} with text")
+
+    def update_transcription_status(self, transcription_id: int, status: str) -> None:
+        """Update transcription status (processing, completed, failed)."""
+        transcription = self.get_by_id(transcription_id)
+        if transcription:
+            transcription.status = status
+            self._db.commit()
+            logger.info(f"Updated transcription {transcription_id} status to: {status}")
+
+    def update_transcription_error(self, transcription_id: int, error: str) -> None:
+        """Update error message."""
+        transcription = self.get_by_id(transcription_id)
+        if transcription:
+            transcription.error_message = error
+            self._db.commit()
+            logger.info(f"Updated transcription {transcription_id} with error")
+
+    def update_task_id(self, transcription_id: int, task_id: str) -> None:
+        """Update Celery task ID."""
+        transcription = self.get_by_id(transcription_id)
+        if transcription:
+            transcription.task_id = task_id
+            self._db.commit()
+            logger.info(f"Updated transcription {transcription_id} with task_id: {task_id}")

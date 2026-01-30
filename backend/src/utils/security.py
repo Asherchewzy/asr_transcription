@@ -12,10 +12,7 @@ def sanitize_search_query(query: str) -> str:
     Returns:
         Sanitized query string (max 255 characters, dangerous chars removed)
     """
-    # Remove potential SQL/HTML/path travelsal injection
+    # SQL/HTML/path travelsal injection
     sanitized = re.sub(r"[<>\"';(){}\\]", "", query)
-
-    # Trim whitespace and limit length
     sanitized = sanitized.strip()[:255]
-
     return sanitized

@@ -32,11 +32,17 @@ class Settings:
         self.whisper_chunk_length_s = int(os.getenv("WHISPER_CHUNK_LENGTH_S", "30"))
         self.whisper_stride_length_s = (4, 4)
 
-        # CORS
+        # fe
         self.cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
 
         # Rate Limiting
         self.transcribe_rate_limit = os.getenv("TRANSCRIBE_RATE_LIMIT", "10/minute")
+
+        # Celery + Redis
+        self.celery_broker_url = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+        self.celery_result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
+        self.redis_host = os.getenv("REDIS_HOST", "redis")
+        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
     @property
     def max_upload_size_bytes(self):

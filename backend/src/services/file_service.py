@@ -76,6 +76,7 @@ class FileService:
                 detail=f"File too large. Maximum size: {self._settings.max_upload_size_mb}MB",
             )
 
+    # not comprehensive, future can consider parse and discard original/some kind of malware s
     def _validate_mime_type(self, file: UploadFile) -> None:
         """Validate MIME type using python-magic."""
         # Read first 2048 bytes to determine file type
@@ -100,31 +101,30 @@ class FileService:
         Returns:
             Sanitized filename safe for filesystem storage, always ending in .mp3
         """
-        # Get just the filename without path components
+        # filename without path components
         filename = os.path.basename(filename)
 
-        # Remove null bytes
+        # null bytes
         safe_name = filename.replace("\x00", "")
 
-        # Remove path traversal patterns
+        # path traversal patterns
         safe_name = safe_name.replace("..", "").replace("/", "").replace("\\", "")
 
         # Keep only safe characters: alphanumeric, dash, underscore, period
         # Remove any HTML/script characters
-        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", filename)
+        # here our 'sample 3.mp3' becomes 'sample_3.mp3' becos space not allowed
+        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", safe_name)  
 
-        # Collapse multiple underscores
+        # collapse multiple underscores
         safe_name = re.sub(r"_+", "_", safe_name)
 
-        # Remove leading/trailing underscores and periods
+        # leading/trailing underscores and periods
         safe_name = safe_name.strip("_.")
 
-        # Ensure filename is not empty
         if not safe_name:
             safe_name = "unnamed"
 
-        # Ensure it has .mp3 extension
-        # partly yo make sure partly to not get something like .exe
+        # partly yo make sure .mp3 extension, partly to not get something like .exe
         if not safe_name.lower().endswith(".mp3"):
             safe_name = safe_name + ".mp3"
 
@@ -142,8 +142,8 @@ class FileService:
             Unique filename
         """
         sanitized = self.sanitize_filename(original_filename)
-        stem = Path(sanitized).stem # no ext
-        suffix = Path(sanitized).suffix # just the ext
+        stem = Path(sanitized).stem # sample_3
+        suffix = Path(sanitized).suffix # .mp3
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         random_suffix = token_hex(4)
@@ -207,18 +207,6 @@ class FileService:
             return True
 
         return False
-
-    def get_file_path(self, filename: str) -> Path | None:
-        """Get full path to a file if it exists.
-
-        Args:
-            filename: Name of file
-
-        Returns:
-            Path to file or None if not found
-        """
-        file_path = self._upload_dir / self.sanitize_filename(filename)
-        return file_path if file_path.exists() else None
 
 
 def get_file_service() -> FileService:
