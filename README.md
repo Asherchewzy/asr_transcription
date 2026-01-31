@@ -6,6 +6,23 @@ Transcribe MP3 audio files using OpenAI Whisper Tiny.
 - Frontend: React + TypeScript + Vite
 - ML Model: Whisper-tiny
 
+
+## Project structure:
+```text
+.
+├── backend/            # FastAPI + Celery service
+│   ├── src/
+│   ├── data/
+│   ├── uploads/
+│   └── tests_special_3/
+├── frontend/           # React app (Vite)
+│   └── src/
+├── sample_data/        # Sample audio files
+├── docker-compose.yml
+└── README.md
+```
+
+
 ### Installations:
 **Docker:**
 - Your choice of VM, this project uses colima:
@@ -80,4 +97,3 @@ npm run test
 # press q to quit after
 ```
                                                                             
-
