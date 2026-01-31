@@ -1,6 +1,17 @@
 # Audio Transcription App
 Transcribe MP3 audio files using OpenAI Whisper Tiny.
 
+## Contents
+- [Tech Stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Installations](#installations)
+- [Sync packages](#sync-packages)
+- [Editing configurations](#editing-configurations)
+- [Starting app with docker](#starting-app-with-docker)
+- [Useful commands for clearing data for clean app restart](#useful-commands-for-clearing-data-for-clean-app-restart)
+- [Access the app and api after containers are up](#access-the-app-and-api-after-containers-are-up)
+- [Run 3 unit test for backend and frontend](#run-3-unit-test-for-backend-and-frontend)
+
 ## Tech Stack
 - Backend: FastAPI + Celery + Redis + SQLite
 - Frontend: React + TypeScript + Vite
