@@ -71,3 +71,8 @@ export default defineConfig([
   },
 ])
 ```
+
+## lint
+```bash
+npm run lint
+```
