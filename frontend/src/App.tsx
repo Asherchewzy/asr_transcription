@@ -1,35 +1,72 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect, useCallback } from 'react';
+import FileUpload from './components/FileUpload';
+import TranscriptionList from './components/TranscriptionList';
+import SearchBar from './components/SearchBar';
+import { apiService } from './services/api';
+import type { Transcription } from './types/transcription';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+  const [searchResults, setSearchResults] = useState<Transcription[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const fetchTranscriptions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.listTranscriptions();
+      setTranscriptions(data);
+    } catch (err) {
+      console.error('Failed to fetch transcriptions:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTranscriptions();
+  }, [fetchTranscriptions]);
+
+  const handleUploadComplete = () => {
+    fetchTranscriptions();
+  };
+
+  const handleSearch = async (query: string) => {
+    if (!query) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const results = await apiService.searchTranscriptions(query);
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Search failed:', err);
+      setSearchResults([]);
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="app">
+      <header>
+        <h1>Audio Transcription</h1>
+      </header>
+
+      <main>
+        <FileUpload onUploadComplete={handleUploadComplete} />
+
+        <SearchBar onSearch={handleSearch} />
+
+        <TranscriptionList
+          transcriptions={isSearching ? searchResults : transcriptions}
+          loading={loading}
+        />
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
