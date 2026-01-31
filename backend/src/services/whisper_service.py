@@ -20,16 +20,16 @@ class WhisperModelService:
     Loading once per application lifecycle saves memory and improves response time for subsequent requests.
     """
 
-    _instance: "WhisperModelService | None" = None 
-    _lock: threading.Lock = threading.Lock() 
-    _initialized: bool = False 
+    _instance: "WhisperModelService | None" = None
+    _lock: threading.Lock = threading.Lock()
+    _initialized: bool = False
 
     def __new__(cls) -> "WhisperModelService":
         """Create singleton instance with double-checked locking."""
         if cls._instance is None:
-            with cls._lock: 
-                if cls._instance is None: 
-                    cls._instance = super().__new__(cls) 
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
@@ -54,7 +54,7 @@ class WhisperModelService:
             device = "cuda"
             logger.info("Using CUDA device")
         elif torch.backends.mps.is_available():
-            # Enable MPS fallback 
+            # Enable MPS fallback
             os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
             device = "mps"
             logger.info("Using MPS device (Apple Silicon)")

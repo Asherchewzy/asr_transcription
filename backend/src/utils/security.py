@@ -1,6 +1,6 @@
 """Security utilities."""
 
-import re2 as re #use google re2 not normal re
+import re2 as re  # use google re2 not normal re
 
 
 def sanitize_search_query(query: str) -> str:

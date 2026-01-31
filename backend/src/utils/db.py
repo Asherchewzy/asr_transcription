@@ -2,14 +2,14 @@
 
 import logging
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
-from sqlalchemy import (DateTime, Integer, String, Text, create_engine,
-                        func, select)
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
 from sqlalchemy.orm import (DeclarativeBase, Mapped, Session, mapped_column,
                             sessionmaker)
+
 from src.utils.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -59,45 +59,44 @@ class Transcription(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # PK
     audio_filename: Mapped[str] = mapped_column(
         String(255), nullable=False, unique=True
-    )  
+    )
     # nullable until transcription completes
-    transcribed_text: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )  
+    transcribed_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=datetime.now, nullable=False
     )
     # processing, completed, failed
     status: Mapped[str] = mapped_column(
-        String(50), default='processing', nullable=False
-    )  
+        String(50), default="processing", nullable=False
+    )
     # celery task ID
-    task_id: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
-    )  
+    task_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     # error details if failed
-    error_message: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )  
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # for readable string and formatting when logging
     def __repr__(self) -> str:
-        return f"<Transcription(id={self.id}, filename='{self.audio_filename}', status='{self.status}')>"
+        """Return a readable representation for logs."""
+        return (
+            f"<Transcription(id={self.id}, filename='{self.audio_filename}', "
+            f"status='{self.status}')>"
+        )
 
 
-#CRUD
+# CRUD
 class TranscriptionRepository:
     """Repository for transcription CRUD operations."""
 
     def __init__(self, db: Session) -> None:
+        """Initialize repository with a database session."""
         self._db = db
 
     def create(
         self,
         audio_filename: str,
         transcribed_text: str | None = None,
-        status: str = 'processing',
-        task_id: str | None = None
+        status: str = "processing",
+        task_id: str | None = None,
     ) -> Transcription:
         """Create new transcription record."""
         transcription = Transcription(
@@ -127,7 +126,9 @@ class TranscriptionRepository:
         stmt = select(Transcription).where(Transcription.id == transcription_id)
         return self._db.execute(stmt).scalar_one_or_none()
 
-    def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> Sequence[Transcription]:
+    def get_by_status(
+        self, status: str, skip: int = 0, limit: int = 100
+    ) -> Sequence[Transcription]:
         """Get transcriptions by status."""
         stmt = (
             select(Transcription)
@@ -183,4 +184,6 @@ class TranscriptionRepository:
         if transcription:
             transcription.task_id = task_id
             self._db.commit()
-            logger.info(f"Updated transcription {transcription_id} with task_id: {task_id}")
+            logger.info(
+                f"Updated transcription {transcription_id} with task_id: {task_id}"
+            )

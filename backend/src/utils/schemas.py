@@ -12,6 +12,9 @@ class HealthResponse(BaseModel):
     timestamp: datetime
     model_loaded: bool
     device_info: str
+    db_healthy: bool = False
+    redis_healthy: bool = False
+    celery_workers_active: bool = False
 
 
 class TranscriptionResponse(BaseModel):
@@ -23,7 +26,7 @@ class TranscriptionResponse(BaseModel):
     audio_filename: str
     transcribed_text: str | None = None
     created_timestamp: datetime
-    status: str = 'processing'
+    status: str = "processing"
     task_id: str | None = None
     error_message: str | None = None
 

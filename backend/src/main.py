@@ -2,7 +2,7 @@
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 
 from celery.result import AsyncResult
 from fastapi import (Depends, FastAPI, File, HTTPException, Query, Request,
@@ -12,14 +12,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
-from src.celery_app import celery, transcribe_audio_task
+
+from src.services.celery_app import celery, transcribe_audio_task
 from src.services.file_service import FileService, get_file_service
 from src.services.whisper_service import (WhisperModelService,
                                           get_whisper_service)
 from src.utils.db import TranscriptionRepository, get_db, init_db
-from src.utils.schemas import (HealthResponse, TranscriptionResponse,
-                               TranscriptionSearchResponse, TranscriptionBatchResponse,
-                               TranscriptionTaskResponse, TaskStatusResponse)
+from src.utils.schemas import (HealthResponse, TaskStatusResponse,
+                               TranscriptionBatchResponse,
+                               TranscriptionResponse,
+                               TranscriptionSearchResponse,
+                               TranscriptionTaskResponse)
 from src.utils.security import sanitize_search_query
 from src.utils.settings import get_settings
 
@@ -79,13 +82,51 @@ async def root():
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
 async def health_check(
     whisper: WhisperModelService = Depends(get_whisper_service),
+    db: Session = Depends(get_db),
 ) -> HealthResponse:
-    """Check API health status and model availability."""
+    """Check API health status including all dependencies."""
+    # Check Whisper model
+    model_healthy = whisper.is_loaded
+
+    # Check database
+    db_healthy = False
+    try:
+        from sqlalchemy import text
+
+        db.execute(text("SELECT 1"))
+        db_healthy = True
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+
+    # Check Redis/Celery broker
+    redis_healthy = False
+    try:
+        celery.broker_connection().ensure_connection(max_retries=1)
+        redis_healthy = True
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+
+    # Check Celery workers
+    celery_workers_healthy = False
+    try:
+        stats = celery.control.inspect().stats()
+        celery_workers_healthy = stats is not None and len(stats) > 0
+    except Exception as e:
+        logger.error(f"Celery worker health check failed: {e}")
+
+    # Overall status
+    all_healthy = all(
+        [model_healthy, db_healthy, redis_healthy, celery_workers_healthy]
+    )
+
     return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now(timezone.utc),
-        model_loaded=whisper.is_loaded,
+        status="healthy" if all_healthy else "degraded",
+        timestamp=datetime.now(),
+        model_loaded=model_healthy,
         device_info=whisper.device,
+        db_healthy=db_healthy,
+        redis_healthy=redis_healthy,
+        celery_workers_active=celery_workers_healthy,
     )
 
 
@@ -119,12 +160,10 @@ async def transcribe_audio(
 
         # Create database record with status="processing"
         transcription = repo.create(
-            audio_filename=unique_filename,
-            transcribed_text=None,
-            status='processing'
+            audio_filename=unique_filename, transcribed_text=None, status="processing"
         )
 
-        # celery 
+        # celery
         task = transcribe_audio_task.delay(str(file_path), transcription.id)
 
         repo.update_task_id(transcription.id, task.id)
@@ -134,7 +173,7 @@ async def transcribe_audio(
                 task_id=task.id,
                 transcription_id=transcription.id,
                 filename=file.filename or unique_filename,
-                status='processing'
+                status="processing",
             )
         )
 
@@ -154,43 +193,30 @@ async def get_task_status(
     task = AsyncResult(task_id, app=celery)
     repo = TranscriptionRepository(db)
 
-    if task.state == 'PENDING':
+    if task.state == "PENDING":
+        return TaskStatusResponse(status="pending", task_id=task_id)
+    elif task.state == "PROCESSING":
         return TaskStatusResponse(
-            status='pending',
-            task_id=task_id
-        )
-    elif task.state == 'PROCESSING':
-        return TaskStatusResponse(
-            status='processing',
+            status="processing",
             task_id=task_id,
-            meta=task.info  # transcribing or saving 
+            meta=task.info,  # transcribing or saving
         )
-    elif task.state == 'SUCCESS':
+    elif task.state == "SUCCESS":
         transcription = repo.get_by_task_id(task_id)
         if transcription:
             return TaskStatusResponse(
-                status='completed',
+                status="completed",
                 task_id=task_id,
                 transcription_id=transcription.id,
-                text=transcription.transcribed_text
+                text=transcription.transcribed_text,
             )
-        return TaskStatusResponse(
-            status='completed',
-            task_id=task_id
-        )
-    elif task.state == 'FAILURE':
+        return TaskStatusResponse(status="completed", task_id=task_id)
+    elif task.state == "FAILURE":
         transcription = repo.get_by_task_id(task_id)
         error_msg = transcription.error_message if transcription else str(task.info)
-        return TaskStatusResponse(
-            status='failed',
-            task_id=task_id,
-            error=error_msg
-        )
+        return TaskStatusResponse(status="failed", task_id=task_id, error=error_msg)
     else:
-        return TaskStatusResponse(
-            status=task.state.lower(),
-            task_id=task_id
-        )
+        return TaskStatusResponse(status=task.state.lower(), task_id=task_id)
 
 
 @app.get(
@@ -201,7 +227,9 @@ async def get_task_status(
 async def list_transcriptions(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: str | None = Query(None, description="Filter by status: completed, processing, failed"),
+    status: str | None = Query(
+        None, description="Filter by status: completed, processing, failed"
+    ),
     db: Session = Depends(get_db),
 ) -> list[TranscriptionResponse]:
     """Get all transcriptions, ordered by most recent first. Optional status filter."""
@@ -254,6 +282,9 @@ async def search_transcriptions(
                 audio_filename=t.audio_filename,
                 transcribed_text=t.transcribed_text,
                 created_timestamp=t.created_timestamp,
+                status=t.status,
+                task_id=t.task_id,
+                error_message=t.error_message,
             )
             for t in results
         ],

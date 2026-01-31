@@ -2,12 +2,12 @@
 
 import logging
 import os
-import re2 as re
-from secrets import token_hex
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
+from secrets import token_hex
 
 import magic
+import re2 as re
 from fastapi import HTTPException, UploadFile, status
 
 from src.utils.settings import get_settings
@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 # for mp3, audio/mpeg is official and audio/mp3 common non-standard
 ALLOWED_MIME_TYPES = {"audio/mpeg", "audio/mp3"}
+# File extension allowlist
+ALLOWED_EXTENSIONS = (".mp3",)
 
 # Maximum chunk size for reading files (64KB)
 CHUNK_SIZE = 64 * 1024
@@ -25,6 +27,7 @@ class FileService:
     """Secure file handling service."""
 
     def __init__(self) -> None:
+        """Initialize file service and ensure upload directory exists."""
         self._settings = get_settings()
         self._upload_dir = Path(self._settings.upload_dir)
         self._upload_dir.mkdir(parents=True, exist_ok=True)
@@ -52,7 +55,7 @@ class FileService:
     def _validate_extension(self, filename: str) -> None:
         """Validate file extension."""
         ext = Path(filename).suffix.lower()
-        allowed = self._settings.allowed_extensions_list 
+        allowed = ALLOWED_EXTENSIONS
 
         if ext not in allowed:
             raise HTTPException(
@@ -113,7 +116,7 @@ class FileService:
         # Keep only safe characters: alphanumeric, dash, underscore, period
         # Remove any HTML/script characters
         # here our 'sample 3.mp3' becomes 'sample_3.mp3' becos space not allowed
-        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", safe_name)  
+        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", safe_name)
 
         # collapse multiple underscores
         safe_name = re.sub(r"_+", "_", safe_name)
@@ -142,10 +145,10 @@ class FileService:
             Unique filename
         """
         sanitized = self.sanitize_filename(original_filename)
-        stem = Path(sanitized).stem # sample_3
-        suffix = Path(sanitized).suffix # .mp3
+        stem = Path(sanitized).stem  # sample_3
+        suffix = Path(sanitized).suffix  # .mp3
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         random_suffix = token_hex(4)
 
         return f"{stem}_{timestamp}_{random_suffix}{suffix}"
@@ -183,7 +186,7 @@ class FileService:
 
         except Exception as e:
             if file_path.exists():
-                file_path.unlink() #delete partial file
+                file_path.unlink()  # delete partial file
             logger.error(f"Failed to save file: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -212,4 +215,3 @@ class FileService:
 def get_file_service() -> FileService:
     """Get file service instance."""
     return FileService()
-
