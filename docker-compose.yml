@@ -1,0 +1,102 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: tran_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - tran_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tran_backend
+    ports:
+      - "8000:8000"
+    volumes: # persisting data outside the container
+      - ./backend/uploads:/app/uploads
+      - ./backend/data:/app/data
+      - ./backend/model_cache:/app/model_cache
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - UPLOAD_DIR=${UPLOAD_DIR}
+      - MODEL_CACHE_DIR=${MODEL_CACHE_DIR}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - tran_network
+
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tran_celery_worker
+    command: celery -A src.services.celery_app worker --loglevel=info --concurrency=2 # extra wait in queue
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/data:/app/data
+      - ./backend/model_cache:/app/model_cache
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - UPLOAD_DIR=${UPLOAD_DIR}
+      - MODEL_CACHE_DIR=${MODEL_CACHE_DIR}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - tran_network
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_MAX_FILE_SIZE: ${VITE_MAX_FILE_SIZE}
+        VITE_ALLOWED_FILE_TYPES: ${VITE_ALLOWED_FILE_TYPES}
+    container_name: tran_frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_MAX_FILE_SIZE=${VITE_MAX_FILE_SIZE}
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - tran_network
+
+networks:
+  tran_network:
+    driver: bridge
+
+volumes:
+  redis_data:
