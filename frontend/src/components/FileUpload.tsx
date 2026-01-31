@@ -75,7 +75,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       });
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setError(message);
       setUploadingFiles(prev =>
         prev.map(uf =>
           newFiles.includes(uf) ? { ...uf, status: 'failed', error: 'Upload failed' } : uf

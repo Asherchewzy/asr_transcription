@@ -39,7 +39,7 @@ class Settings:
         self.cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
 
         # Rate Limiting
-        self.transcribe_rate_limit = os.getenv("TRANSCRIBE_RATE_LIMIT", "10/minute")
+        self.transcribe_rate_limit = os.getenv("TRANSCRIBE_RATE_LIMIT", "15/minute")
 
         # Celery + Redis
         self.celery_broker_url = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")

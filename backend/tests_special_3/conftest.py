@@ -67,14 +67,14 @@ def test_client(test_db, temp_upload_dir):
 
     app.dependency_overrides[get_file_service] = override_get_file_service
 
-    # Disable rate limiting for tests by setting enabled=False on the actual limiter
+    # disable rate limiting for tests by setting enabled=False on the actual limiter
     original_enabled = limiter.enabled
     limiter.enabled = False
 
     with TestClient(app) as client:
         yield client
 
-    # Restore original state
+    # restore original state
     limiter.enabled = original_enabled
     app.dependency_overrides.clear()
 

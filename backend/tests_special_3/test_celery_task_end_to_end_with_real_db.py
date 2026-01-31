@@ -18,7 +18,7 @@ class TestCeleryTaskEndToEnd:
 
     def test_transcribe_success_updates_db_status_to_completed(self, test_db):
         """test happy path: task completes and updates db status to completed"""
-        # arrange - create initial db record
+        # create initial db record
         repo = TranscriptionRepository(test_db)
         transcription = repo.create(
             audio_filename="test_audio.mp3", transcribed_text=None, status="processing"

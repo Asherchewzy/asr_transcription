@@ -475,10 +475,12 @@ class TestRateLimiting:
 
     def test_rate_limit_enforcement(self, test_client, sample_mp3_bytes):
         """Test that rate limiting prevents excessive requests."""
-        from src.main import limiter
+        from src.main import limiter, settings
 
         # Enable rate limiting for this specific test
         limiter.enabled = True
+        original_limit = settings.transcribe_rate_limit
+        settings.transcribe_rate_limit = "5/minute"
 
         try:
             mock_task = MagicMock()
@@ -518,3 +520,4 @@ class TestRateLimiting:
         finally:
             # Disable rate limiting again for other tests
             limiter.enabled = False
+            settings.transcribe_rate_limit = original_limit

@@ -19,6 +19,45 @@ class ApiService {
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        let detail = '';
+        let limit: string | undefined;
+        const headerLimit =
+          response.headers.get('x-ratelimit-limit') ||
+          response.headers.get('ratelimit-limit') ||
+          response.headers.get('X-RateLimit-Limit') ||
+          undefined;
+
+        const errorBody = await response.json().catch(() => null);
+        if (typeof errorBody?.detail === 'string') {
+          detail = errorBody.detail;
+        }
+        if (typeof errorBody?.limit === 'string') {
+          limit = errorBody.limit;
+        }
+
+        if (!limit && detail) {
+          const match = detail.match(/rate limit exceeded:?\s*(.*)$/i);
+          if (match?.[1]) {
+            limit = match[1].trim();
+          } else {
+            const inline = detail.match(/(\d+\s*\/\s*\w+|\d+\s+per\s+\d+\s+\w+)/i);
+            if (inline?.[0]) {
+              limit = inline[0];
+            }
+          }
+        }
+
+        if (!limit && headerLimit) {
+          limit = headerLimit;
+        }
+
+        const message = limit
+          ? `Rate limit has been hit. Limit: ${limit}`
+          : 'Rate limit has been hit. Please try again later.';
+        throw new Error(message);
+      }
+
       const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
       throw new Error(error.detail || 'Upload failed');
     }

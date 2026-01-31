@@ -3,7 +3,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# install build dependencies
+# build dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -32,7 +32,6 @@ COPY --from=builder /app/.venv /app/.venv
 # copy application code
 COPY src/ ./src/
 
-# create directories
 RUN mkdir -p uploads data model_cache
 
 # Non-root user
