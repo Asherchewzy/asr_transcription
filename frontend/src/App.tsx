@@ -11,6 +11,7 @@ function App() {
   const [searchResults, setSearchResults] = useState<Transcription[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'healthy' | 'degraded' | 'unknown'>('unknown');
 
   const fetchTranscriptions = useCallback(async () => {
     setLoading(true);
@@ -24,9 +25,25 @@ function App() {
     }
   }, []);
 
+  const fetchHealth = useCallback(async () => {
+    try {
+      const data = await apiService.getHealth();
+      setHealthStatus(data.status === 'healthy' ? 'healthy' : 'degraded');
+    } catch (err) {
+      console.error('Health check failed:', err);
+      setHealthStatus('degraded');
+    }
+  }, []);
+
   useEffect(() => {
     fetchTranscriptions();
   }, [fetchTranscriptions]);
+
+  useEffect(() => {
+    fetchHealth();
+    const intervalId = window.setInterval(fetchHealth, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [fetchHealth]);
 
   const handleUploadComplete = () => {
     fetchTranscriptions();
@@ -56,6 +73,11 @@ function App() {
       </header>
 
       <main>
+        {healthStatus === 'degraded' && (
+          <div className="health-banner" role="status">
+            Transcription service unavailable—retry later or restart services
+          </div>
+        )}
         <FileUpload onUploadComplete={handleUploadComplete} />
 
         <SearchBar onSearch={handleSearch} />

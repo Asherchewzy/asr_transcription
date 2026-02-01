@@ -19,19 +19,20 @@ class TestConcurrentFileUploads:
     """test concurrent file upload race conditions."""
 
     def test_10_concurrent_uploads_all_succeed(
-        self, test_client, sample_mp3_bytes, temp_upload_dir
+        self, test_client, sample_mp3_bytes, temp_upload_dir 
     ):
-        """test that concurrent uploads all succeed"""
+        """test /api/v1/transcribe endpoint can handle 10 simultaneous file uploads without failing"""
         # mock celery task to avoid actual processing
         mock_task = MagicMock()
         mock_task.id = "test-task-id"
         mock_task.delay.return_value = mock_task
 
+        # sends a fake MP3 upload from in memoty
         def upload_file(file_index):
             """upload a single file."""
             files = {
                 "files": (
-                    f"test_file_{file_index}.mp3",
+                    f"test_file_{file_index}.mp3", 
                     io.BytesIO(sample_mp3_bytes),
                     "audio/mpeg",
                 )
@@ -41,7 +42,7 @@ class TestConcurrentFileUploads:
         with patch("src.main.transcribe_audio_task") as mock_celery:
             mock_celery.delay.return_value = mock_task
 
-            # submit uploads concurrently
+            # submit uploads concurrently, collect the results as each task completes
             num_uploads = 10
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = [executor.submit(upload_file, i) for i in range(num_uploads)]
@@ -86,9 +87,10 @@ class TestConcurrentFileUploads:
 
         # verify all filenames are unique
         saved_files = list(temp_upload_dir.glob("*.mp3"))
-        filenames = [f.name for f in saved_files]
-        unique_filenames = set(filenames)
+        filenames = [f.name for f in saved_files] 
+        unique_filenames = set(filenames) 
 
+        # len(list) vs len(set(list)) which is depub 
         assert len(filenames) == len(
             unique_filenames
         ), f"duplicate filenames detected: {filenames}"
@@ -100,10 +102,10 @@ class TestConcurrentFileUploads:
         mock_task = MagicMock()
         mock_task.id = "test-task-id"
 
-        task_count = [0]
+        task_count = [0] 
 
         def mock_delay(*args, **kwargs):
-            task_count[0] += 1
+            task_count[0] += 1 
             mock_result = MagicMock()
             mock_result.id = f"task-{task_count[0]}"
             return mock_result
@@ -162,7 +164,7 @@ class TestConcurrentFileUploads:
         with patch("src.main.transcribe_audio_task") as mock_celery:
             mock_celery.delay.return_value = mock_task
 
-            # submit mixed batch: 1 valid + 1 invalid (reduced from 5+5)
+            # submit mixed batch: 1 valid + 1 invalid 
             num_batch = 1
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = []
@@ -193,6 +195,7 @@ class TestConcurrentFileUploads:
         fake_mp3 = b"not a real mp3 file content" * 100
 
         files = {"files": ("fake.mp3", io.BytesIO(fake_mp3), "audio/mpeg")}
+        # test_client in conftest
         response = test_client.post("/api/v1/transcribe", files=files)
 
         # should fail validation (400) or be rate limited (429)
@@ -202,6 +205,7 @@ class TestConcurrentFileUploads:
         ), f"expected 400 or 429, got {response.status_code}"
 
         # if not rate limited, verify no files left in upload directory
+        # If the server rejects the file, it should not leave a partial file in the upload directory.
         if response.status_code == 400:
             saved_files = list(temp_upload_dir.glob("*"))
             assert len(saved_files) == 0, f"partial files left: {saved_files}"
@@ -229,7 +233,6 @@ class TestConcurrentFileUploads:
         with patch("src.main.transcribe_audio_task") as mock_celery:
             mock_celery.delay.side_effect = mock_delay
 
-            # test invalid extensions
             num_uploads = 5
             with ThreadPoolExecutor(max_workers=5) as executor:
                 futures = [executor.submit(upload_file, i) for i in range(num_uploads)]
@@ -243,7 +246,7 @@ class TestConcurrentFileUploads:
                 for task in data["tasks"]:
                     task_ids.append(task["task_id"])
 
-        # verify all successful uploads have unique task ids (may be rate limited)
+        # verify all successful uploads have unique task ids 
         if task_ids:
             assert len(set(task_ids)) == len(
                 task_ids
@@ -274,6 +277,7 @@ class TestConcurrentFileUploads:
         def generate_filename(index):
             return file_service.generate_unique_filename("concurrent.mp3")
 
+        # same name = race = not thread safe
         with ThreadPoolExecutor(max_workers=20) as executor:
             futures = [executor.submit(generate_filename, i) for i in range(100)]
             filenames = [f.result() for f in as_completed(futures)]
@@ -307,7 +311,6 @@ class TestConcurrentFileUploads:
             mock_celery.delay.side_effect = mock_delay
             response = test_client.post("/api/v1/transcribe", files=files)
 
-        # may be rate limited due to test order
         if response.status_code == 200:
             data = response.json()
             assert len(data["tasks"]) == num_files
@@ -316,8 +319,8 @@ class TestConcurrentFileUploads:
             saved_files = list(temp_upload_dir.glob("*.mp3"))
             assert len(saved_files) == num_files
 
-    def test_rate_limiting_under_load(self, test_client, sample_mp3_bytes):
-        """test that rate limiting works correctly"""
+    def test_response_under_load(self, test_client, sample_mp3_bytes):
+        """test basic robustness under a small burst (no crashes/timeouts) and that there is valid status 200/429."""
         mock_task = MagicMock()
         mock_task.id = "rate-test-task"
         mock_task.delay.return_value = mock_task
@@ -335,12 +338,12 @@ class TestConcurrentFileUploads:
         with patch("src.main.transcribe_audio_task") as mock_celery:
             mock_celery.delay.return_value = mock_task
 
-            # send 3 requests - may hit rate limit depending on prior tests
             results = []
             for i in range(3):
                 results.append(upload_file(i))
 
         # verify we got responses (either 200 or 429)
+        # by right should not 429 as limiter.enabled = False set in conftest.py
         status_codes = [r.status_code for r in results]
         assert all(
             code in (200, 429) for code in status_codes
@@ -352,11 +355,9 @@ class TestFileValidations:
 
     def test_file_size_validation_rejects_oversized_files(self, test_client):
         """Test that files exceeding size limit are rejected."""
-        # Create a file that's definitely over the limit - use settings value
+        # add 1kb to the settings.max_upload_size_bytes
         from src.utils.settings import get_settings
-
         settings = get_settings()
-        # Create file larger than the configured max
         oversized_data = b"\xff\xfb\x90\x00" * (settings.max_upload_size_bytes + 1024)
 
         mock_task = MagicMock()
@@ -376,6 +377,7 @@ class TestFileValidations:
         self, test_client, sample_mp3_bytes
     ):
         """Test that invalid file extensions are rejected."""
+        # mime and bytes is mp3 but extension is .exe
         files = {"files": ("malware.exe", io.BytesIO(sample_mp3_bytes), "audio/mpeg")}
         response = test_client.post("/api/v1/transcribe", files=files)
 
@@ -387,6 +389,7 @@ class TestFileValidations:
     ):
         """Test that MIME type spoofing is detected."""
         # File named .mp3 but actually an exe
+        # mime and name is mp3 but btyes not mp3
         files = {"files": ("fake.mp3", io.BytesIO(invalid_file_bytes), "audio/mpeg")}
         response = test_client.post("/api/v1/transcribe", files=files)
 
@@ -403,7 +406,7 @@ class TestFileValidations:
 
         files = {
             "files": (
-                "../../etc/passwd.mp3",
+                "../../etc/passwd.mp3", 
                 io.BytesIO(sample_mp3_bytes),
                 "audio/mpeg",
             )
@@ -417,6 +420,7 @@ class TestFileValidations:
         assert response.status_code == 200
 
         # Verify the actual saved file doesn't have path traversal
+        # should be passwd.mp3
         # Check files saved to temp directory
         saved_files = list(temp_upload_dir.glob("*.mp3"))
         assert len(saved_files) == 1
@@ -490,7 +494,7 @@ class TestRateLimiting:
             with patch("src.main.transcribe_audio_task") as mock_celery:
                 mock_celery.delay.return_value = mock_task
 
-                # Make requests - at least some should be rate limited
+                # at least some should be rate limited
                 responses = []
                 for i in range(10):
                     files = {

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from celery.result import AsyncResult
 from fastapi import (Depends, FastAPI, File, HTTPException, Query, Request,
-                     UploadFile, status)
+                     Response, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -81,6 +81,7 @@ async def root():
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
 async def health_check(
+    response: Response,
     whisper: WhisperModelService = Depends(get_whisper_service),
     db: Session = Depends(get_db),
 ) -> HealthResponse:
@@ -114,10 +115,20 @@ async def health_check(
     except Exception as e:
         logger.error(f"Celery worker health check failed: {e}")
 
+    issues: list[str] = []
+    if not model_healthy:
+        issues.append("whisper_model_unloaded")
+    if not db_healthy:
+        issues.append("database_unhealthy")
+    if not redis_healthy:
+        issues.append("redis_unhealthy")
+    if not celery_workers_healthy:
+        issues.append("celery_workers_inactive")
+
     # Overall status
-    all_healthy = all(
-        [model_healthy, db_healthy, redis_healthy, celery_workers_healthy]
-    )
+    all_healthy = len(issues) == 0
+    if not all_healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return HealthResponse(
         status="healthy" if all_healthy else "degraded",
@@ -127,6 +138,7 @@ async def health_check(
         db_healthy=db_healthy,
         redis_healthy=redis_healthy,
         celery_workers_active=celery_workers_healthy,
+        issues=issues,
     )
 
 

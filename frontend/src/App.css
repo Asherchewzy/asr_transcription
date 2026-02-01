@@ -18,6 +18,15 @@ header h1 {
   margin-bottom: 0.5rem;
 }
 
+.health-banner {
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: #fff3e0;
+  color: #663c00;
+  font-weight: 600;
+}
+
 main {
   display: flex;
   flex-direction: column;

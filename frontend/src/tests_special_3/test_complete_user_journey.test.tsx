@@ -19,6 +19,7 @@ vi.mock('../services/api', () => ({
     getTaskStatus: vi.fn(),
     listTranscriptions: vi.fn(),
     searchTranscriptions: vi.fn(),
+    getHealth: vi.fn(),
   },
 }));
 
@@ -32,6 +33,16 @@ describe('complete user journey', () => {
     vi.clearAllMocks();
     vi.mocked(validation.validateFiles).mockReturnValue({ valid: true });
     vi.mocked(api.apiService.listTranscriptions).mockResolvedValue([]);
+    vi.mocked(api.apiService.getHealth).mockResolvedValue({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      model_loaded: true,
+      device_info: 'cpu',
+      db_healthy: true,
+      redis_healthy: true,
+      celery_workers_active: true,
+      issues: [],
+    });
   });
 
   afterEach(() => {
@@ -47,7 +58,7 @@ describe('complete user journey', () => {
 
     // wait for initial render
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // verify app renders with all components
@@ -111,7 +122,7 @@ describe('complete user journey', () => {
 
     await act(async () => {
       fireEvent.change(input, { target: { files: [mockFile] } });
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // verify file appears in upload list (may appear in both upload and transcription list)
@@ -120,7 +131,7 @@ describe('complete user journey', () => {
     // advance time to trigger second poll
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // the completed status should appear somewhere
@@ -149,7 +160,7 @@ describe('complete user journey', () => {
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'my_audio' } });
       fireEvent.click(searchButton);
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // verify search was called with the query
@@ -170,7 +181,7 @@ describe('complete user journey', () => {
     render(<App />);
 
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     expect(screen.getByText(/drag and drop MP3 files/i)).toBeInTheDocument();
@@ -203,7 +214,7 @@ describe('complete user journey', () => {
 
     await act(async () => {
       fireEvent.change(input, { target: { files: [mockFile] } });
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // verify failure is displayed
@@ -246,7 +257,7 @@ describe('complete user journey', () => {
 
     // wait for transcriptions to load
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     expect(screen.getByText('existing1.mp3')).toBeInTheDocument();
@@ -300,7 +311,7 @@ describe('complete user journey', () => {
 
     // verify initially empty
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
     expect(screen.getByText(/no transcriptions found/i)).toBeInTheDocument();
 
@@ -316,7 +327,7 @@ describe('complete user journey', () => {
 
     await act(async () => {
       fireEvent.change(input, { target: { files: [mockFile] } });
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // listTranscriptions should be called again after upload completes
@@ -360,7 +371,7 @@ describe('complete user journey', () => {
     render(<App />);
 
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     expect(screen.getByText('all1.mp3')).toBeInTheDocument();
@@ -373,7 +384,7 @@ describe('complete user journey', () => {
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'all1' } });
       fireEvent.click(searchButton);
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // wait for search results
@@ -383,7 +394,7 @@ describe('complete user journey', () => {
     const clearButton = screen.getByText('Clear');
     await act(async () => {
       fireEvent.click(clearButton);
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // should show all transcriptions again
@@ -398,7 +409,7 @@ describe('complete user journey', () => {
     render(<App />);
 
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     expect(screen.getByPlaceholderText(/search by filename/i)).toBeInTheDocument();
@@ -408,7 +419,7 @@ describe('complete user journey', () => {
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'enter_search' } });
       fireEvent.keyPress(searchInput, { key: 'Enter', charCode: 13 });
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // search should be triggered
@@ -429,7 +440,7 @@ describe('complete user journey', () => {
     // advance time to complete the fetch
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1100);
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // loading should be gone
@@ -447,7 +458,7 @@ describe('complete user journey', () => {
     render(<App />);
 
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.runOnlyPendingTimersAsync();
     });
 
     // app should still render without crashing

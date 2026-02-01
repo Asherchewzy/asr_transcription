@@ -22,3 +22,14 @@ export interface TaskStatus {
   text?: string;
   error?: string;
 }
+
+export interface HealthResponse {
+  status: 'healthy' | 'degraded';
+  timestamp: string;
+  model_loaded: boolean;
+  device_info: string;
+  db_healthy: boolean;
+  redis_healthy: boolean;
+  celery_workers_active: boolean;
+  issues: string[];
+}

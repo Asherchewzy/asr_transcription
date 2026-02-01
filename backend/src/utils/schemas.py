@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
@@ -15,6 +15,7 @@ class HealthResponse(BaseModel):
     db_healthy: bool = False
     redis_healthy: bool = False
     celery_workers_active: bool = False
+    issues: list[str] = Field(default_factory=list)
 
 
 class TranscriptionResponse(BaseModel):

@@ -36,6 +36,7 @@ class TestHealthCheckDependencyFailures:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+        assert data["issues"] == []
         assert data["model_loaded"] is True
         assert data["db_healthy"] is True
         assert data["redis_healthy"] is True
@@ -64,10 +65,11 @@ class TestHealthCheckDependencyFailures:
 
         del app.dependency_overrides[get_whisper_service]
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["model_loaded"] is False
+        assert "whisper_model_unloaded" in data["issues"]
 
     def test_db_connection_failure_returns_degraded(self, test_client, test_db):
         """test that database connection failure returns degraded status"""
@@ -97,10 +99,11 @@ class TestHealthCheckDependencyFailures:
             with patch("src.main.celery", mock_celery):
                 response = test_client.get("/api/v1/health")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["db_healthy"] is False
+        assert "database_unhealthy" in data["issues"]
 
     def test_redis_ping_failure_returns_degraded(self, test_client):
         """test that redis/broker connection failure returns degraded status"""
@@ -122,10 +125,11 @@ class TestHealthCheckDependencyFailures:
             with patch("src.main.celery", mock_celery):
                 response = test_client.get("/api/v1/health")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["redis_healthy"] is False
+        assert "redis_unhealthy" in data["issues"]
 
     def test_celery_workers_inactive_returns_degraded(self, test_client):
         """test that when no celery workers are active, status is degraded"""
@@ -144,10 +148,11 @@ class TestHealthCheckDependencyFailures:
             with patch("src.main.celery", mock_celery):
                 response = test_client.get("/api/v1/health")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["celery_workers_active"] is False
+        assert "celery_workers_inactive" in data["issues"]
 
     def test_celery_workers_empty_dict_returns_degraded(self, test_client):
         """test that empty workers dict returns degraded status"""
@@ -166,10 +171,11 @@ class TestHealthCheckDependencyFailures:
             with patch("src.main.celery", mock_celery):
                 response = test_client.get("/api/v1/health")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["celery_workers_active"] is False
+        assert "celery_workers_inactive" in data["issues"]
 
     def test_celery_inspect_exception_returns_degraded(self, test_client):
         """test that celery inspect exception returns degraded status"""
@@ -186,10 +192,11 @@ class TestHealthCheckDependencyFailures:
             with patch("src.main.celery", mock_celery):
                 response = test_client.get("/api/v1/health")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["celery_workers_active"] is False
+        assert "celery_workers_inactive" in data["issues"]
 
     def test_multiple_failures_still_returns_response(self, test_client):
         """test that multiple dependency failures still return valid response"""
@@ -217,13 +224,18 @@ class TestHealthCheckDependencyFailures:
 
         del app.dependency_overrides[get_whisper_service]
 
-        # should still return 200 with degraded status (not crash)
-        assert response.status_code == 200
+        # should still return 503 with degraded status (not crash)
+        assert response.status_code == 503
         data = response.json()
         assert data["status"] == "degraded"
         assert data["model_loaded"] is False
         assert data["redis_healthy"] is False
         assert data["celery_workers_active"] is False
+        assert set(data["issues"]) == {
+            "whisper_model_unloaded",
+            "redis_unhealthy",
+            "celery_workers_inactive",
+        }
 
     def test_timestamp_is_current(self, test_client):
         """test that health check returns current timestamp (not cached)"""
@@ -313,6 +325,7 @@ class TestHealthCheckDependencyFailures:
             "db_healthy",
             "redis_healthy",
             "celery_workers_active",
+            "issues",
         ]
 
         for field in required_fields:

@@ -1,4 +1,4 @@
-import type { Transcription, TaskResponse, TaskStatus } from '../types/transcription';
+import type { HealthResponse, Transcription, TaskResponse, TaskStatus } from '../types/transcription';
 
 class ApiService {
   private baseURL: string;
@@ -102,6 +102,17 @@ class ApiService {
 
     const data = await response.json();
     return data.results;
+  }
+
+  async getHealth(): Promise<HealthResponse> {
+    const response = await fetch(`${this.baseURL}/api/v1/health`);
+    const data = await response.json().catch(() => null);
+
+    if (!data) {
+      throw new Error('Health check failed');
+    }
+
+    return data as HealthResponse;
   }
 }
 
