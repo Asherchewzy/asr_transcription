@@ -16,7 +16,7 @@ COPY package*.json ./
 # install dependencies
 RUN npm ci
 
-# cp source code 
+# cp source code
 COPY . .
 
 # Build the app
@@ -31,7 +31,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-#nginx 
+#nginx
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -69,7 +69,7 @@ services:
         condition: service_started
     networks:
       - tran_network
-  
+
   frontend:
     build:
       context: ./frontend

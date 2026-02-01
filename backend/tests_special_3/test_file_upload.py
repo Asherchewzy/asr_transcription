@@ -19,7 +19,7 @@ class TestConcurrentFileUploads:
     """test concurrent file upload race conditions."""
 
     def test_10_concurrent_uploads_all_succeed(
-        self, test_client, sample_mp3_bytes, temp_upload_dir 
+        self, test_client, sample_mp3_bytes, temp_upload_dir
     ):
         """test /api/v1/transcribe endpoint can handle 10 simultaneous file uploads without failing"""
         # mock celery task to avoid actual processing
@@ -32,7 +32,7 @@ class TestConcurrentFileUploads:
             """upload a single file."""
             files = {
                 "files": (
-                    f"test_file_{file_index}.mp3", 
+                    f"test_file_{file_index}.mp3",
                     io.BytesIO(sample_mp3_bytes),
                     "audio/mpeg",
                 )
@@ -87,10 +87,10 @@ class TestConcurrentFileUploads:
 
         # verify all filenames are unique
         saved_files = list(temp_upload_dir.glob("*.mp3"))
-        filenames = [f.name for f in saved_files] 
-        unique_filenames = set(filenames) 
+        filenames = [f.name for f in saved_files]
+        unique_filenames = set(filenames)
 
-        # len(list) vs len(set(list)) which is depub 
+        # len(list) vs len(set(list)) which is depub
         assert len(filenames) == len(
             unique_filenames
         ), f"duplicate filenames detected: {filenames}"
@@ -102,10 +102,10 @@ class TestConcurrentFileUploads:
         mock_task = MagicMock()
         mock_task.id = "test-task-id"
 
-        task_count = [0] 
+        task_count = [0]
 
         def mock_delay(*args, **kwargs):
-            task_count[0] += 1 
+            task_count[0] += 1
             mock_result = MagicMock()
             mock_result.id = f"task-{task_count[0]}"
             return mock_result
@@ -164,7 +164,7 @@ class TestConcurrentFileUploads:
         with patch("src.main.transcribe_audio_task") as mock_celery:
             mock_celery.delay.return_value = mock_task
 
-            # submit mixed batch: 1 valid + 1 invalid 
+            # submit mixed batch: 1 valid + 1 invalid
             num_batch = 1
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = []
@@ -246,7 +246,7 @@ class TestConcurrentFileUploads:
                 for task in data["tasks"]:
                     task_ids.append(task["task_id"])
 
-        # verify all successful uploads have unique task ids 
+        # verify all successful uploads have unique task ids
         if task_ids:
             assert len(set(task_ids)) == len(
                 task_ids
@@ -357,6 +357,7 @@ class TestFileValidations:
         """Test that files exceeding size limit are rejected."""
         # add 1kb to the settings.max_upload_size_bytes
         from src.utils.settings import get_settings
+
         settings = get_settings()
         oversized_data = b"\xff\xfb\x90\x00" * (settings.max_upload_size_bytes + 1024)
 
@@ -406,7 +407,7 @@ class TestFileValidations:
 
         files = {
             "files": (
-                "../../etc/passwd.mp3", 
+                "../../etc/passwd.mp3",
                 io.BytesIO(sample_mp3_bytes),
                 "audio/mpeg",
             )
