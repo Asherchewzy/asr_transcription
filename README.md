@@ -65,9 +65,8 @@ This set up will:
 - Set up backend dependencies via `uv`
 - Install frontend dependencies (npm packages)
 - Check for FFmpeg and Node.js (required dependencies)
+- This setup does not install docker VM or daemons.
 
-However, if this fails, please go through the "Installations if you need" and "Sync packages" section.
-This setup does not install docker VM or daemons.
 
 ```bash
 # by bash
@@ -77,7 +76,7 @@ bash setup.sh
 chmod +x setup.sh
 ./setup.sh
 ```
-
+However, if this fails, please go through the Manual Setup section.
 
 ## Manual Setup:
 ### Installations if you need:
